@@ -43,6 +43,7 @@ ADD --link https://packages.microsoft.com/config/debian/12/packages-microsoft-pr
 # useful for in-container troubleshooting). Apt packages are served from the
 # BuildKit cache mount on subsequent builds.
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
     dpkg -i /packages-microsoft-prod.deb \
  && rm /packages-microsoft-prod.deb \
  && apt-get update \
