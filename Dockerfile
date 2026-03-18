@@ -5,11 +5,14 @@ FROM mcr.microsoft.com/dotnet/sdk:9.0 AS builder
 
 WORKDIR /src
 
-# Clone both source repositories (shallow — history not needed for build).
-# TechnitiumLibrary must be cloned alongside DnsServer so relative project
+# Clone TechnitiumLibrary (external dependency).
+# TechnitiumLibrary must sit alongside DnsServer so relative project
 # references in the .csproj files resolve correctly.
-RUN git clone --depth 1 https://github.com/TechnitiumSoftware/TechnitiumLibrary.git TechnitiumLibrary \
- && git clone --depth 1 https://github.com/TechnitiumSoftware/DnsServer.git DnsServer
+RUN git clone --depth 1 https://github.com/TechnitiumSoftware/TechnitiumLibrary.git TechnitiumLibrary
+
+# Copy local DnsServer source from the build context.
+# Run `docker build .` from the DnsServer/ directory.
+COPY . DnsServer/
 
 # Build TechnitiumLibrary dependencies then publish DnsServer.
 # NuGet packages are cached via BuildKit cache mount: even when the git clone
@@ -30,15 +33,19 @@ RUN rm -f /etc/apt/apt.conf.d/docker-clean \
 # Fetch the Microsoft package repository definition.
 # ADD --link caches this layer independently: re-downloading is only triggered
 # if the URL content changes, not when other layers are invalidated.
-ADD --link https://packages.microsoft.com/config/debian/12/packages-microsoft-prod.deb /tmp/packages-microsoft-prod.deb
+# ADD --link caches this layer independently of other layers.
+# Destination is intentionally NOT /tmp: ADD --link creates its own overlay
+# layer including the parent directory entry, which would override /tmp's
+# sticky permissions (1777 → 0755) and break apt's temp file creation.
+ADD --link https://packages.microsoft.com/config/debian/12/packages-microsoft-prod.deb /packages-microsoft-prod.deb
 
 # Install libmsquic (required for DNS-over-QUIC / HTTP/3) and dnsutils (dig,
 # useful for in-container troubleshooting). Apt packages are served from the
 # BuildKit cache mount on subsequent builds.
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
-    dpkg -i /tmp/packages-microsoft-prod.deb \
- && rm /tmp/packages-microsoft-prod.deb \
+    dpkg -i /packages-microsoft-prod.deb \
+ && rm /packages-microsoft-prod.deb \
  && apt-get update \
  && apt-get install -y --no-install-recommends libmsquic dnsutils \
  && apt-get autoremove -y
