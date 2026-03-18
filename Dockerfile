@@ -5,11 +5,14 @@ FROM mcr.microsoft.com/dotnet/sdk:9.0 AS builder
 
 WORKDIR /src
 
-# Clone both source repositories (shallow — history not needed for build).
-# TechnitiumLibrary must be cloned alongside DnsServer so relative project
+# Clone TechnitiumLibrary (external dependency).
+# TechnitiumLibrary must sit alongside DnsServer so relative project
 # references in the .csproj files resolve correctly.
-RUN git clone --depth 1 https://github.com/TechnitiumSoftware/TechnitiumLibrary.git TechnitiumLibrary \
- && git clone --depth 1 https://github.com/TechnitiumSoftware/DnsServer.git DnsServer
+RUN git clone --depth 1 https://github.com/TechnitiumSoftware/TechnitiumLibrary.git TechnitiumLibrary
+
+# Copy local DnsServer source from the build context.
+# Run `docker build .` from the DnsServer/ directory.
+COPY . DnsServer/
 
 # Build TechnitiumLibrary dependencies then publish DnsServer.
 # NuGet packages are cached via BuildKit cache mount: even when the git clone
@@ -36,7 +39,6 @@ ADD --link https://packages.microsoft.com/config/debian/12/packages-microsoft-pr
 # useful for in-container troubleshooting). Apt packages are served from the
 # BuildKit cache mount on subsequent builds.
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
-    --mount=type=cache,target=/var/lib/apt,sharing=locked \
     dpkg -i /tmp/packages-microsoft-prod.deb \
  && rm /tmp/packages-microsoft-prod.deb \
  && apt-get update \

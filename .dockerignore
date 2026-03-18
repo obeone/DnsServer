@@ -1,0 +1,24 @@
+# Git
+.git
+.gitignore
+.gitattributes
+.github
+
+# Worktrees
+.worktrees
+
+# Build output (rebuilt inside Docker)
+**/bin
+**/obj
+
+# Windows-only projects (not needed for Linux/Docker build)
+DnsServerWindowsSetup
+DnsServerSystemTrayApp
+DnsServerWindowsService
+
+# Docker artifacts
+Dockerfile
+docker-compose.yml
+
+# Docs
+*.md
