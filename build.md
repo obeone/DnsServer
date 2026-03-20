@@ -12,6 +12,8 @@ To build the Technitium DNS Server Windows Setup, you need to install [Microsoft
 
 ## For Linux
 
+### Install as a systemd service
+
 Follow the instructions given below to build and install the DNS server from source. These instructions are written for Ubuntu and Raspberry Pi OS but, you can easily follow similar steps on your favorite distro.
 
 1. Install prerequisites like curl and git.
@@ -40,8 +42,6 @@ sudo apt update
 sudo apt install dotnet-sdk-9.0 libmsquic -y
 ```
 
-Note! If you do not plan to use DNS-over-QUIC or HTTP/3 support, or you intend to just build a docker image then you can skip installing `libmsquic`.
-
 4. Clone the source code for both [TechnitiumLibrary](https://github.com/TechnitiumSoftware/TechnitiumLibrary) and [DnsServer](https://github.com/TechnitiumSoftware/DnsServer) into the current folder.
 ```
 git clone --depth 1 https://github.com/TechnitiumSoftware/TechnitiumLibrary.git TechnitiumLibrary
@@ -61,9 +61,6 @@ dotnet publish DnsServer/DnsServerApp/DnsServerApp.csproj -c Release
 ```
 
 7. Install the DNS server as a systemd service.
-
-Note! Skip this step if you wish to build and use docker image.
-
 ```
 sudo mkdir -p /opt/technitium/dns
 sudo cp -r DnsServer/DnsServerApp/bin/Release/publish/* /opt/technitium/dns
@@ -76,25 +73,34 @@ sudo rm /etc/resolv.conf
 echo "nameserver 127.0.0.1" | sudo tee /etc/resolv.conf
 ```
 
-8. Build and run docker image.
+8. Open the DNS server web console in a web browser using `http://<server-ip-address>:5380/` URL and set a login password to complete the installation.
 
-Note! Skip this step if you have already installed the DNS server as a systemd service in previous step.
+### Build and run a Docker image
 
-Note! Before proceeding to build a Docker image, it is required that you have installed `docker` on your computer.
+The Dockerfile uses a multi-stage build: the first stage compiles the source entirely inside a container (no .NET SDK required on the host), and the second stage produces the final runtime image.
 
-Follow the commands given below to build a docker image for the DNS server.
+**Prerequisites:** `git` and `docker` (with BuildKit support — Docker 23+ recommended).
 
+1. Clone the DnsServer repository.
+```
+git clone --depth 1 https://github.com/TechnitiumSoftware/DnsServer.git DnsServer
+```
+
+2. Build the Docker image from the `DnsServer` directory.
 ```
 cd DnsServer
-sudo docker build -t technitium/dns-server:latest .
+docker build -t technitium/dns-server:latest .
 ```
 
-You can now run the image that you have built using `docker compose` as shown below. You should edit the `docker-compose.yml` file if you wish to edit the container's configuration before running it.
+Note! TechnitiumLibrary is fetched automatically during the Docker build. No separate clone or `dotnet` installation is needed on the host.
 
+Note! BuildKit caches NuGet packages and apt packages between builds. Subsequent builds are significantly faster.
+
+3. Run the image using `docker compose`. Edit `docker-compose.yml` to adjust the configuration before starting.
 ```
 sudo systemctl stop systemd-resolved
 sudo systemctl disable systemd-resolved
-sudo docker compose up -d
+docker compose up -d
 ```
 
-9. Open the DNS server web console in a web browser using `http://<server-ip-address>:5380/` URL and set a login password to complete the installation.
+4. Open the DNS server web console in a web browser using `http://<server-ip-address>:5380/` URL and set a login password to complete the installation.
